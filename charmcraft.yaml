@@ -6,7 +6,7 @@ summary: Runs the Keystone Kubernetes Authenticator in the cluster.
 description: Runs the Keystone Kubernetes Authenticator in the cluster.
 links:
   contact: https://launchpad.net/~containers
-  documentation: https://discourse.charmhub.io/t/keystone-k8s-auth-docs-index/???
+  documentation: https://discourse.charmhub.io/t/keystone-k8s-auth/14554
   issues:
   - https://github.com/canonical/keystone-k8s-auth-operator/issues
   source:

@@ -1,4 +1,5 @@
 # keystone-k8s-auth
+[![null](https://charmhub.io/keystone-k8s-auth/badge.svg)](https://charmhub.io/keystone-k8s-auth)
 
 ## Description
 
