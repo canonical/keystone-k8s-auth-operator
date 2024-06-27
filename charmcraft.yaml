@@ -1,0 +1,169 @@
+# Copyright 2024 Canonical, Ltd.
+# See LICENSE file for licensing details.
+name: keystone-k8s-auth
+title: Keystone K8s Authentication Operator
+summary: Runs the Keystone Kubernetes Authenticator in the cluster.
+description: Runs the Keystone Kubernetes Authenticator in the cluster.
+links:
+  contact: https://launchpad.net/~containers
+  documentation: https://discourse.charmhub.io/t/keystone-k8s-auth-docs-index/???
+  issues:
+  - https://github.com/canonical/keystone-k8s-auth-operator/issues
+  source:
+    - https://github.com/canonical/keystone-k8s-auth-operator
+subordinate: true
+
+requires:
+  keystone:
+    interface: keystone-credentials
+    limit: 1
+  kube-control:
+    interface: kube-control
+    limit: 1
+  kubernetes:
+    interface: juju-info
+    scope: container
+  certificates:
+    interface: tls-certificates
+
+type: charm
+bases:
+  - build-on:
+      - name: ubuntu
+        channel: "20.04"
+        architectures: [amd64]
+    run-on:
+      - name: ubuntu
+        channel: "20.04"
+        architectures: [amd64, arm64, s390x]
+      - name: ubuntu
+        channel: "22.04"
+        architectures: [amd64, arm64, s390x]
+config:
+  options:
+    keystone-ssl-ca:
+      type: string
+      description: |
+        Keystone certificate authority encoded in base64 for securing communications to Keystone.
+        For example: `juju config keystone-k8s-auth keystone-ssl-ca=$(base64 /path/to/ca.crt)`
+    
+    keystone-policy-configmap:
+      type: string
+      description: |
+        https://github.com/kubernetes/cloud-provider-openstack/blob/a59b8a28d23b1f265eb066e760b56d72ad29e91f/examples/webhook/keystone-policy-configmap.yaml
+        This is used to configure the k8s-keystone-auth service.
+        The ConfigMap will be created in the same namespace as the k8s-keystone-auth service.
+      default: |-
+        [
+          {
+            "users": {
+              "projects": ["demo"],
+              "roles": ["member"]
+            },
+            "resource_permissions": {
+              "*/pods": ["get", "list", "watch"]
+            }
+          }
+        ]
+
+    image-registry:
+      type: string
+      description: |
+        Source registry of keystone auth images.
+
+        By setting to a value, each image listed in the releases manifest
+        has its image-registry replaced.
+
+        If unset, the manifests will use the image registry from the kube-control relation
+
+        example)
+          juju config keystone-k8s-auth image-registry='rocks.canonical.com:443/cdk'
+          juju config keystone-k8s-auth --reset image-registry
+
+    manager-release:
+      type: string
+      description: |
+        Specify the version of controller-manager-release as defined by the `release`
+        tags of https://github.com/kubernetes/cloud-provider-openstack
+
+        example)
+          juju config keystone-k8s-auth manager-release='v1.30.0'
+        
+        A list of supported versions is available through the action:
+          juju run-action keystone-k8s-auth/leader list-releases --wait
+        
+        To reset by to the latest supported by the charm use:
+          juju config keystone-k8s-auth --reset manager-release
+        
+        The current release deployed is available by viewing
+          juju status keystone-k8s-auth
+
+actions:
+  generate-webhook:
+    description: Generate a webhook configuration for the k8s-keystone-auth service.
+    params:
+      fqdn:
+        type: boolean
+        default: False
+        description: Get the in-cluster FQDN for the k8s-keystone-auth service.
+  get-service-url:
+    description: Get the active service URL for the k8s-keystone-auth service.
+    params:
+      fqdn:
+        type: boolean
+        default: False
+        description: Get the in-cluster FQDN for the k8s-keystone-auth service.
+  list-versions:
+    description: List Storage Versions supported by this charm
+  list-resources:
+    description: List Storage Resources of configured version
+    params:
+      controller:
+        type: string
+        default: ""
+        description: |
+          Filter list based on "storage" manifests.
+      resources:
+        type: string
+        default: ""
+        description: |
+          Space separated list of kubernetes resource types to filter list result
+  scrub-resources:
+    description: Remove deployments other than the current one
+    params:
+      controller:
+        type: string
+        default: ""
+        description: |
+          Filter list based on "storage" manifests.
+      resources:
+        type: string
+        default: ""
+        description: |
+          Space separated list of kubernetes resource types to filter scrubbing   
+  sync-resources:
+    description: |
+      Add kubernetes resources which should be created by this charm which aren't
+      present within the cluster.
+    params:
+      controller:
+        type: string
+        default: ""
+        description: |
+          Filter list based on "storage" manifests.
+      resources:
+        type: string
+        default: ""
+        description: |
+          Space separated list of kubernetes resource types
+          to use a filter during the sync. This helps limit
+          which missing resources are applied.
+
+parts:
+  charm:
+    build-packages:
+      - git
+    charm-python-packages: [setuptools, pip]
+    prime:
+      - upstream/**
+      - templates/**

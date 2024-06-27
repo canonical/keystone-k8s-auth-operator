@@ -1,0 +1,33 @@
+api-endpoints: '["https://10.246.154.7:6443"]'
+cluster-tag: kubernetes-4ypskxahbu3rnfgsds3pksvwe3uh0lxt
+cohort-keys: |-
+  {
+    "cdk-addons": "",
+    "kube-apiserver": "",
+    "kube-controller-manager": "",
+    "kube-proxy": "",
+    "kube-scheduler": "",
+    "kubectl": "",
+    "kubelet": ""
+  }
+creds: |-
+  {
+    "keystone-k8s-auth/0": {
+      "client_token": "admin::reacted",
+      "kubelet_token": "keystone-k8s-auth::reacted",
+      "proxy_token": "kube-proxy::reacted", 
+      "scope": "keystone-k8s-auth/0"
+    }
+  }
+default-cni: '""'
+domain: cluster.local
+egress-subnets: 10.246.154.7/32
+enable-kube-dns: "True"
+has-xcp: "false"
+ingress-address: 10.246.154.7
+port: "53"
+private-address: 10.246.154.7
+registry-location: rocks.canonical.com:443/cdk
+sdn-ip: 10.152.183.20
+taints: '["node-role.kubernetes.io/control-plane=true:NoSchedule"]'
+labels: '["node-role.kubernetes.io/control-plane=true"]'

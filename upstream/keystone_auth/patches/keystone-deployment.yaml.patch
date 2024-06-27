@@ -1,0 +1,24 @@
+--- 000-keystone-deployment.yaml.orig   2024-06-27 15:30:58.508049313 -0500
++++ 000-keystone-deployment.yaml        2024-06-27 15:30:58.510049346 -0500
+@@ -22,12 +22,13 @@
+           args:
+             - ./bin/k8s-keystone-auth
+-            - --tls-cert-file
+-            - /etc/pki/tls.crt
+-            - --tls-private-key-file
+-            - /etc/pki/tls.key
+-            - --policy-configmap-name
+-            - k8s-auth-policy
+-            - --keystone-url
+-            - {{ keystone_server_url }}
++          env:
++            - name: OS_AUTH_URL
++              value: ''
++            - name: TLS_CERT_FILE
++              value: /etc/pki/tls.crt
++            - name: TLS_PRIVATE_KEY_FILE
++              value: /etc/pki/tls.key
++            - name: KEYSTONE_POLICY_CONFIGMAP_NAME
++              value: k8s-auth-policy
+           volumeMounts:
+             - mountPath: /etc/pki

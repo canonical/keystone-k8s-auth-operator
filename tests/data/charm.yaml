@@ -1,0 +1,12 @@
+description: Overlay for attaching current charm
+applications:
+  kubernetes-control-plane:
+    options:
+      allow-privileged: "true"
+  keystone-k8s-auth:
+    charm: {{ charm }}
+relations:
+- [keystone-k8s-auth:certificates, easyrsa:client]
+- [keystone-k8s-auth:kube-control, kubernetes-control-plane:kube-control]
+- [keystone-k8s-auth:keystone,     keystone:identity-credentials]
+- [keystone-k8s-auth:kubernetes,   kubernetes-control-plane:juju-info]

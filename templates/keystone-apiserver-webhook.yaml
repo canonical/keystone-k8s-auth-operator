@@ -1,0 +1,17 @@
+# https://github.com/kubernetes/cloud-provider-openstack/blob/release-1.30/examples/webhook/keystone-apiserver-webhook.yaml
+apiVersion: v1
+kind: Config
+preferences: {{}}
+clusters:
+  - cluster:
+      server: {service_url}
+      certificate-authority-data: {certificate_authority_data}
+    name: webhook
+users:
+  - name: webhook
+contexts:
+  - context:
+      cluster: webhook
+      user: webhook
+    name: webhook
+current-context: webhook
