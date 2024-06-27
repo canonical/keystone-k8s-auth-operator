@@ -10,7 +10,7 @@ from typing import Dict, Optional
 
 from lightkube.codecs import AnyResource
 from lightkube.models.core_v1 import EnvVar
-from lightkube.resources.core_v1 import ConfigMap, Service, Secret
+from lightkube.resources.core_v1 import ConfigMap, Secret, Service
 from ops.interface_tls_certificates import CertificatesRequires
 from ops.manifests import Addition, ConfigRegistry, ManifestLabel, Manifests, Patch
 
@@ -41,8 +41,8 @@ class CreateSecret(Addition):
             metadata={"name": SECRET_NAME, "namespace": NAMESPACE},
             type="kubernetes.io/tls",
             data={
-                "tls.crt": base64.b64encode(tls_cert.encode()).decode(), 
-                "tls.key": base64.b64encode(tls_key.encode()).decode()
+                "tls.crt": base64.b64encode(tls_cert.encode()).decode(),
+                "tls.key": base64.b64encode(tls_key.encode()).decode(),
             },
         )
         if ca_cert:
@@ -155,7 +155,7 @@ class ProviderManifests(Manifests):
     def evaluate(self) -> Optional[str]:
         """Determine if manifest_config can be applied to manifests."""
         props = (
-            UpdateSecret.REQUIRED_CONFIG
+            CreateSecret.REQUIRED_CONFIG
             | UpdateDeployment.REQUIRED_CONFIG
             | Policy.REQUIRED_CONFIG
         )
