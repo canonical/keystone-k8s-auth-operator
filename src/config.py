@@ -1,6 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-"""Config Management for the cloud-controller-manager charm."""
+"""Config Management for the keystone-k8s-auth charm."""
 
 import logging
 from typing import Optional

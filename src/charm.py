@@ -7,6 +7,7 @@ import base64
 import logging
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import charms.contextual_status as status
 import ops
@@ -126,11 +127,11 @@ class KeystoneK8sCharm(ops.CharmBase):
 
     def _check_credentials(self, event):
         self.unit.status = ops.MaintenanceStatus("Evaluating Keystone credentials relation.")
+        self.credentials.request_credentials(self.app.name)
         if evaluation := self.credentials.evaluate_relation(event):
             status_type = ops.WaitingStatus if "Waiting" in evaluation else ops.BlockedStatus
             status.add(status_type(evaluation))
             raise status.ReconcilerError(evaluation)
-        self.credentials.request_credentials(self.app.name)
 
     def _check_certificates(self, event):
         self.unit.status = ops.MaintenanceStatus("Evaluating certificates.")
@@ -138,7 +139,12 @@ class KeystoneK8sCharm(ops.CharmBase):
             status_type = ops.WaitingStatus if "Waiting" in evaluation else ops.BlockedStatus
             status.add(status_type(evaluation))
             raise status.ReconcilerError(evaluation)
-        self.certificates.request_server_cert(cn=COMMON_NAME)
+        sans = []
+        if url := self.provider.get_service_url(fqdn=True):
+            sans.append(urlparse(url).hostname)
+        if url := self.provider.get_service_url():
+            sans.append(urlparse(url).hostname)
+        self.certificates.request_server_cert(cn=COMMON_NAME, sans=sans)
         self._ca_cert_path.write_text(self.certificates.ca)
 
     def _check_kube_control(self, event):

@@ -1,6 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-"""Implementation of cloud-controller specific details of the kubernetes manifests."""
+"""Implementation of keystone-k8s-auth specific details of the kubernetes manifests."""
 
 import base64
 import logging
@@ -8,11 +8,20 @@ import pickle
 from hashlib import md5
 from typing import Dict, Optional
 
+from httpx import HTTPError
 from lightkube.codecs import AnyResource
+from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EnvVar
 from lightkube.resources.core_v1 import ConfigMap, Secret, Service
 from ops.interface_tls_certificates import CertificatesRequires
-from ops.manifests import Addition, ConfigRegistry, ManifestLabel, Manifests, Patch
+from ops.manifests import (
+    Addition,
+    ConfigRegistry,
+    ManifestClientError,
+    ManifestLabel,
+    Manifests,
+    Patch,
+)
 
 log = logging.getLogger(__file__)
 COMMON_NAME = "k8s-keystone-auth.kube-system"
@@ -37,7 +46,7 @@ class CreateSecret(Addition):
         tls_key: str = self.manifests.config.get("tls.key")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
         log.info("Encode secret data for k8s-keystone-auth.")
-        secret = Secret(
+        struct = dict(
             metadata={"name": SECRET_NAME, "namespace": NAMESPACE},
             type="kubernetes.io/tls",
             data={
@@ -46,7 +55,9 @@ class CreateSecret(Addition):
             },
         )
         if ca_cert:
-            secret.data["ca.crt"] = base64.b64encode(ca_cert.encode()).decode()
+            log.info("Adding ca.crt to secret.")
+            struct["data"]["ca.crt"] = base64.b64encode(ca_cert.encode()).decode()
+        return Secret.from_dict(struct)
 
 
 class UpdateDeployment(Patch):
@@ -154,6 +165,10 @@ class ProviderManifests(Manifests):
 
     def evaluate(self) -> Optional[str]:
         """Determine if manifest_config can be applied to manifests."""
+        release_path = self.manifest_path / self.current_release
+        if not release_path.exists():
+            return f"Release {self.current_release} does not exist."
+
         props = (
             CreateSecret.REQUIRED_CONFIG
             | UpdateDeployment.REQUIRED_CONFIG
@@ -169,8 +184,9 @@ class ProviderManifests(Manifests):
         """Return the service url."""
         if fqdn:
             return f"https://{SERVICE_NAME}.{NAMESPACE}.svc.cluster.local:8443/webhook"
-        for rsc in self.installed_resources():
-            if rsc.kind == "Service" and rsc.name == SERVICE_NAME and rsc.namespace == NAMESPACE:
-                svc: Service = rsc.resource
-                return f"https://{svc.spec.clusterIP}:8443/webhook"
+        try:
+            svc: Service = self.client.get(Service, SERVICE_NAME, namespace=NAMESPACE)
+            return f"https://{svc.spec.clusterIP}:8443/webhook"
+        except (ManifestClientError, ApiError, HTTPError) as e:
+            log.error("Failed to get service url. ex=%s", e)
         return None

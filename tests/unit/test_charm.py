@@ -162,6 +162,7 @@ def test_waits_for_kube_control(mock_create_kubeconfig, harness, caplog):
     storage_messages = {r.message for r in caplog.records if "provider" in r.filename}
 
     assert storage_messages == {
+        "Adding ca.crt to secret.",
         "Encode secret data for k8s-keystone-auth.",
         "Patching server_url for Deployment/k8s-keystone-auth",
         "Setting secret for Deployment/k8s-keystone-auth",
