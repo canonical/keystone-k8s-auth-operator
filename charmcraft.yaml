@@ -11,34 +11,37 @@ links:
   - https://github.com/canonical/keystone-k8s-auth-operator/issues
   source:
   - https://github.com/canonical/keystone-k8s-auth-operator
-subordinate: true
 
+type: charm
+subordinate: true
 requires:
+  juju-info:
+    # This charm is a subordinate charm so requires a primary to host it
+    # Its intended to be linked to a kubernetes control-plane unit as the primary
+    interface: juju-info
+    scope: container
   keystone:
     interface: keystone-credentials
     limit: 1
   kube-control:
     interface: kube-control
     limit: 1
-  kubernetes:
-    interface: juju-info
-    scope: container
   certificates:
     interface: tls-certificates
 
-type: charm
 bases:
-  - build-on:
-      - name: ubuntu
-        channel: "20.04"
-        architectures: [amd64]
-    run-on:
-      - name: ubuntu
-        channel: "20.04"
-        architectures: [amd64, arm64, s390x]
-      - name: ubuntu
-        channel: "22.04"
-        architectures: [amd64, arm64, s390x]
+- build-on:
+  - name: ubuntu
+    channel: "20.04"
+    architectures: [amd64]
+  run-on:
+  - name: ubuntu
+    channel: "20.04"
+    architectures: [amd64, arm64, s390x]
+  - name: ubuntu
+    channel: "22.04"
+    architectures: [amd64, arm64, s390x]
+
 config:
   options:
     keystone-ssl-ca:
@@ -65,7 +68,6 @@ config:
             }
           }
         ]
-
     image-registry:
       type: string
       description: |
@@ -79,27 +81,31 @@ config:
         example)
           juju config keystone-k8s-auth image-registry='rocks.canonical.com:443/cdk'
           juju config keystone-k8s-auth --reset image-registry
-
-    manager-release:
+    release:
       type: string
       description: |
-        Specify the version of controller-manager-release as defined by the `release`
+        Specify the version of keystone-k8s-auth as defined by the `release`
         tags of https://github.com/kubernetes/cloud-provider-openstack
 
         example)
-          juju config keystone-k8s-auth manager-release='v1.30.0'
+          juju config keystone-k8s-auth release='v1.30.0'
         
         A list of supported versions is available through the action:
           juju run-action keystone-k8s-auth/leader list-releases --wait
         
         To reset by to the latest supported by the charm use:
-          juju config keystone-k8s-auth --reset manager-release
+          juju config keystone-k8s-auth --reset release
         
         The current release deployed is available by viewing
           juju status keystone-k8s-auth
+    replicas:
+      type: int
+      description: |
+        Number of pod replicas to run for the k8s-keystone-auth service.
+      default: 2
 
 actions:
-  generate-webhook:
+  generate-webhook-config:
     description: Generate a webhook configuration for the k8s-keystone-auth service.
     params:
       fqdn:
@@ -118,11 +124,6 @@ actions:
   list-resources:
     description: List Storage Resources of configured version
     params:
-      controller:
-        type: string
-        default: ""
-        description: |
-          Filter list based on "storage" manifests.
       resources:
         type: string
         default: ""
@@ -131,11 +132,6 @@ actions:
   scrub-resources:
     description: Remove deployments other than the current one
     params:
-      controller:
-        type: string
-        default: ""
-        description: |
-          Filter list based on "storage" manifests.
       resources:
         type: string
         default: ""
@@ -146,11 +142,6 @@ actions:
       Add kubernetes resources which should be created by this charm which aren't
       present within the cluster.
     params:
-      controller:
-        type: string
-        default: ""
-        description: |
-          Filter list based on "storage" manifests.
       resources:
         type: string
         default: ""
@@ -162,8 +153,8 @@ actions:
 parts:
   charm:
     build-packages:
-      - git
+    - git
     charm-python-packages: [setuptools, pip]
     prime:
-      - upstream/**
-      - templates/**
+    - upstream/**
+    - templates/**

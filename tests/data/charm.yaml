@@ -6,6 +6,8 @@ applications:
     num_units: 1
     options:
       admin-password: "testpw"
+  kubernetes-control-plane:
+    num_units: 2
   keystone-mysql-router:
     charm: mysql-router
     channel: 8.0/stable
@@ -35,4 +37,4 @@ relations:
 - [keystone-k8s-auth:certificates, easyrsa:client]
 - [keystone-k8s-auth:kube-control, kubernetes-control-plane:kube-control]
 - [keystone-k8s-auth:keystone,     keystone:identity-credentials]
-- [keystone-k8s-auth:kubernetes,   kubernetes-control-plane:juju-info]
+- [keystone-k8s-auth:juju-info,   kubernetes-control-plane:juju-info]

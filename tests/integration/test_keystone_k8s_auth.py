@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from juju.application import Application
 from juju.unit import Unit
+from lightkube.resources.apps_v1 import Deployment
+from lightkube.resources.core_v1 import Service
 
 log = logging.getLogger(__name__)
 
@@ -40,13 +42,26 @@ async def test_build_and_deploy(ops_test):
     await ops_test.model.wait_for_idle(wait_for_active=True, timeout=60 * 60)
 
 
+async def test_deployment_running(kubernetes):
+    objects = []
+    async for svc in kubernetes.list(Service, namespace="kube-system"):
+        objects.append(svc)
+    assert any(s.metadata.name == "k8s-keystone-auth-service" for s in objects)
+
+    async for dep in kubernetes.list(Deployment, namespace="kube-system"):
+        objects.append(dep)
+    assert any(d.metadata.name == "k8s-keystone-auth" for d in objects)
+    deployment = next(d for d in objects if d.metadata.name == "k8s-keystone-auth")
+    assert deployment.status.readyReplicas == deployment.spec.replicas
+
+
 @pytest.fixture(scope="module")
 async def generate_webhook(ops_test):
     keystone_k8s_auth = ops_test.model.applications["keystone-k8s-auth"]
-    result = await keystone_k8s_auth.units[0].run_action("generate-webhook")
+    result = await keystone_k8s_auth.units[0].run_action("generate-webhook-config")
     await result.wait()
     assert result.status == "completed"
-    return result.results["webhook"]
+    return result.results["webhook-config"]
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +78,8 @@ async def test_actions(generate_webhook, service_url):
     assert service_url is not None
 
 
-async def test_integration(ops_test, generate_webhook, service_url):
+@pytest.fixture(scope="module")
+async def integrate_with_control_plane(ops_test, generate_webhook, service_url):
     control_plane = ops_test.model.applications["kubernetes-control-plane"]
     await control_plane.set_config(
         {
@@ -123,6 +139,7 @@ async def keystone_client(ops_test, tmp_path_factory):
     yield keystone_client_unit
 
 
+@pytest.mark.usefixtures("integrate_with_control_plane")
 async def test_client_auth(ops_test, keystone_client: Unit):
     keystone_k8s_auth = ops_test.model.applications["keystone-k8s-auth"]
     policies = [
@@ -160,3 +177,19 @@ async def test_client_auth(ops_test, keystone_client: Unit):
     output = await keystone_client.run(f'su - ubuntu -c "{cmd}"', block=True)
     code, stderr = output.results["return-code"], output.results["stderr"]
     assert code == 0, stderr
+
+
+async def test_remove_charm(ops_test, kubernetes):
+    keystone_k8s_auth: Application = ops_test.model.applications["keystone-k8s-auth"]
+    await keystone_k8s_auth.remove()
+    await ops_test.model.block_until(
+        lambda: "keystone-k8s-auth" not in ops_test.model.applications, timeout=10 * 60
+    )
+    objects = []
+    async for svc in kubernetes.list(Service, namespace="kube-system"):
+        objects.append(svc)
+    assert not any(s.metadata.name == "k8s-keystone-auth-service" for s in objects)
+
+    async for dep in kubernetes.list(Deployment, namespace="kube-system"):
+        objects.append(dep)
+    assert not any(d.metadata.name == "k8s-keystone-auth" for d in objects)

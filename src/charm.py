@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-"""Deploy and manage the Controller-Manager for K8s on OpenStack."""
+"""Deploy and manage Keystone K8s Auth."""
 
 import base64
 import logging
 import os
+import shutil
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -54,7 +55,7 @@ class KeystoneK8sCharm(ops.CharmBase):
         self.framework.observe(self.on.list_resources_action, self._list_resources)
         self.framework.observe(self.on.scrub_resources_action, self._scrub_resources)
         self.framework.observe(self.on.sync_resources_action, self._sync_resources)
-        self.framework.observe(self.on.generate_webhook_action, self._generate_webhook)
+        self.framework.observe(self.on.generate_webhook_config_action, self._generate_webhook)
         self.framework.observe(self.on.get_service_url_action, self._get_service_url)
         self.framework.observe(self.on.update_status, self._on_update_status)
 
@@ -72,20 +73,17 @@ class KeystoneK8sCharm(ops.CharmBase):
         self.collector.list_versions(event)
 
     def _list_resources(self, event):
-        manifests = event.params.get("controller", "")
         resources = event.params.get("resources", "")
-        return self.collector.list_resources(event, manifests, resources)
+        return self.collector.list_resources(event, "", resources)
 
     def _scrub_resources(self, event):
-        manifests = event.params.get("controller", "")
         resources = event.params.get("resources", "")
-        return self.collector.scrub_resources(event, manifests, resources)
+        return self.collector.scrub_resources(event, "", resources)
 
     def _sync_resources(self, event):
-        manifests = event.params.get("controller", "")
         resources = event.params.get("resources", "")
         try:
-            self.collector.apply_missing_resources(event, manifests, resources)
+            self.collector.apply_missing_resources(event, "", resources)
         except ManifestClientError:
             msg = "Failed to apply missing resources. API Server unavailable."
             event.set_results({"result": msg})
@@ -99,7 +97,7 @@ class KeystoneK8sCharm(ops.CharmBase):
             file_content = Path("templates/keystone-apiserver-webhook.yaml").read_text()
             ca_encoded = base64.b64encode(ca.encode()).decode()
             formatted = file_content.format(certificate_authority_data=ca_encoded, service_url=url)
-            event.set_results({"webhook": formatted})
+            event.set_results({"webhook-config": formatted})
 
     def _get_service_url(self, event: ops.ActionEvent):
         if url := self.provider.get_service_url(fqdn=event.params.get("fqdn")):
@@ -221,10 +219,10 @@ class KeystoneK8sCharm(ops.CharmBase):
     def _cleanup(self):
         if self.stored.config_hash:
             self.unit.status = ops.MaintenanceStatus("Cleaning up K8s Keystone Auth")
-            for controller in self.collector.manifests.values():
-                controller.delete_manifests(ignore_unauthorized=True)
+            for manifest in self.collector.manifests.values():
+                manifest.delete_manifests(ignore_unauthorized=True)
         self.unit.status = ops.MaintenanceStatus("Shutting down")
-        self._kubeconfig_path.parent.unlink(missing_ok=True)
+        shutil.rmtree(self._kubeconfig_path.parent, ignore_errors=True)
 
     def _destroying(self, event: ops.EventBase) -> bool:
         """Check if the charm is being destroyed."""

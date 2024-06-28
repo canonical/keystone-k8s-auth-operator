@@ -33,8 +33,8 @@ class CreateSecret(Addition):
     def __call__(self) -> Optional[AnyResource]:
         """Craft the secrets object for the deployment."""
 
-        tls_cert: str = self.manifests.config.get("tls.crt")
-        tls_key: str = self.manifests.config.get("tls.key")
+        tls_cert: str = self.manifests.config.get("tls.crt", "")
+        tls_key: str = self.manifests.config.get("tls.key", "")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
         log.info("Encode secret data for k8s-keystone-auth.")
         struct = dict(
@@ -66,10 +66,12 @@ class UpdateDeployment(Patch):
                 volume.secret.secretName = SECRET_NAME
                 log.info(f"Setting secret for {obj.kind}/{obj.metadata.name}")
 
-        server_url: str = self.manifests.config.get("keystone-url")
+        server_url: str = self.manifests.config.get("keystone-url", "")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
+        replicas: int = self.manifests.config.get("replicas", 2)
 
         log.info("Patching server_url for %s/%s", obj.kind, obj.metadata.name)
+        obj.spec.replicas = replicas
         for container in obj.spec.template.spec.containers:
             if container.name == RESOURCE_NAME:
                 for env in container.env:
@@ -85,7 +87,7 @@ class Policy(Addition):
 
     def __call__(self) -> Optional[AnyResource]:
         """Craft the policy config-map object."""
-        policy: str = self.manifests.config["keystone-policy-configmap"]
+        policy: str = self.manifests.config.get("keystone-policy-configmap", "[]")
 
         return ConfigMap.from_dict(
             dict(
@@ -147,7 +149,7 @@ class ProviderManifests(Manifests):
             if value == "" or value is None:
                 del config[key]
 
-        config["release"] = config.pop("manager-release", None)
+        config["release"] = config.pop("release", None)
         return config
 
     def hash(self) -> int:
