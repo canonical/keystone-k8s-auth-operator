@@ -109,6 +109,7 @@ class KeystoneK8sCharm(ops.CharmBase):
 
     def _update_status(self):
         unready = self.collector.unready
+        self._request_certificates()  # ensure certificate request is up-to-date
         if unready:
             self.unit.status = ops.WaitingStatus(", ".join(unready))
         else:
@@ -133,18 +134,21 @@ class KeystoneK8sCharm(ops.CharmBase):
             status.add(status_type(evaluation))
             raise status.ReconcilerError(evaluation)
 
-    def _check_certificates(self, event):
-        self.unit.status = ops.MaintenanceStatus("Evaluating certificates.")
-        if evaluation := self.certificates.evaluate_relation(event):
-            status_type = ops.WaitingStatus if "Waiting" in evaluation else ops.BlockedStatus
-            status.add(status_type(evaluation))
-            raise status.ReconcilerError(evaluation)
+    def _request_certificates(self):
         sans = []
         if url := self.provider.get_service_url(fqdn=True):
             sans.append(urlparse(url).hostname)
         if url := self.provider.get_service_url():
             sans.append(urlparse(url).hostname)
         self.certificates.request_server_cert(cn=COMMON_NAME, sans=sans)
+
+    def _check_certificates(self, event):
+        self.unit.status = ops.MaintenanceStatus("Evaluating certificates.")
+        if evaluation := self.certificates.evaluate_relation(event):
+            status_type = ops.WaitingStatus if "Waiting" in evaluation else ops.BlockedStatus
+            status.add(status_type(evaluation))
+            raise status.ReconcilerError(evaluation)
+        self._request_certificates()
         self._ca_cert_path.write_text(self.certificates.ca)
 
     def _check_kube_control(self, event):

@@ -8,20 +8,11 @@ import pickle
 from hashlib import md5
 from typing import Dict, Optional
 
-from httpx import HTTPError
 from lightkube.codecs import AnyResource
-from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EnvVar
 from lightkube.resources.core_v1 import ConfigMap, Secret, Service
 from ops.interface_tls_certificates import CertificatesRequires
-from ops.manifests import (
-    Addition,
-    ConfigRegistry,
-    ManifestClientError,
-    ManifestLabel,
-    Manifests,
-    Patch,
-)
+from ops.manifests import Addition, ConfigRegistry, ManifestLabel, Manifests, Patch
 
 log = logging.getLogger(__file__)
 COMMON_NAME = "k8s-keystone-auth.kube-system"
@@ -187,6 +178,6 @@ class ProviderManifests(Manifests):
         try:
             svc: Service = self.client.get(Service, SERVICE_NAME, namespace=NAMESPACE)
             return f"https://{svc.spec.clusterIP}:8443/webhook"
-        except (ManifestClientError, ApiError, HTTPError) as e:
+        except Exception as e:
             log.error("Failed to get service url. ex=%s", e)
         return None
