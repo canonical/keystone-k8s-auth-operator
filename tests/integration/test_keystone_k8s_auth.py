@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from juju.application import Application
+from juju.model import Model
 from juju.unit import Unit
 from lightkube.resources.apps_v1 import Deployment
 from lightkube.resources.core_v1 import Service
@@ -28,18 +29,15 @@ async def test_build_and_deploy(ops_test):
 
     bundle, *overlays = await ops_test.async_render_bundles(*overlays, charm=charm.resolve())
 
-    log.info("Deploy Charm...")
+    log.info("Deploying Charm...")
     model = ops_test.model_full_name
     cmd = f"juju deploy -m {model} {bundle} " + " ".join(f"--overlay={f}" for f in overlays)
     rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
     assert rc == 0, f"Bundle deploy failed: {(stderr or stdout).strip()}"
-
     log.info(stdout)
-    await ops_test.model.block_until(
-        lambda: "keystone-k8s-auth" in ops_test.model.applications, timeout=60
-    )
 
     await ops_test.model.wait_for_idle(wait_for_active=True, timeout=60 * 60)
+    assert "keystone-k8s-auth" in ops_test.model.applications
 
 
 async def test_deployment_running(kubernetes):
@@ -78,9 +76,9 @@ async def test_actions(generate_webhook, service_url):
     assert service_url is not None
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 async def integrate_with_control_plane(ops_test, generate_webhook, service_url):
-    control_plane = ops_test.model.applications["kubernetes-control-plane"]
+    control_plane: Application = ops_test.model.applications["kubernetes-control-plane"]
     await control_plane.set_config(
         {
             "authorization-webhook-config-file": generate_webhook,
@@ -88,8 +86,14 @@ async def integrate_with_control_plane(ops_test, generate_webhook, service_url):
             "authn-webhook-endpoint": service_url,
         }
     )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(wait_for_active=True, timeout=5 * 60)
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(wait_for_active=True, timeout=15 * 60)
+    yield
+    await control_plane.reset_config(
+        ["authorization-webhook-config-file", "authorization-mode", "authn-webhook-endpoint"]
+    )
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(wait_for_active=True, timeout=15 * 60)
 
 
 @pytest.fixture(scope="module")
