@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 from juju.application import Application
-from juju.model import Model
 from juju.unit import Unit
 from lightkube.resources.apps_v1 import Deployment
 from lightkube.resources.core_v1 import Service
@@ -97,12 +96,26 @@ async def integrate_with_control_plane(ops_test, generate_webhook, service_url):
 
 
 @pytest.fixture(scope="module")
-async def keystone_client(ops_test, tmp_path_factory):
+async def keystone_address(ops_test):
+    keystone = ops_test.model.applications["keystone"]
+    unit = keystone.units[0]
+    yield unit.safe_data["private-address"]
+
+
+@pytest.fixture(scope="module")
+async def api_server_address(ops_test):
+    for name in ["kubeapi-load-balancer", "kubernetes-control-plane"]:
+        app = ops_test.model.applications.get(name)
+        if app and app.units:
+            unit = app.units[0]
+            return unit.safe_data["private-address"]
+
+
+@pytest.fixture(scope="module")
+async def keystone_client(ops_test, tmp_path_factory, keystone_address, api_server_address):
     tmp_path = tmp_path_factory.mktemp("keystone-client")
-    keystone: Application = ops_test.model.applications["keystone"]
     keystone_client: Application = ops_test.model.applications["keystone-client"]
     control_plane: Application = ops_test.model.applications["kubernetes-control-plane"]
-    keystone_unit: Unit = keystone.units[0]
     keystone_client_unit: Unit = keystone_client.units[0]
     control_plane_unit: Unit = control_plane.units[0]
 
@@ -133,8 +146,8 @@ async def keystone_client(ops_test, tmp_path_factory):
         "keystone_password": "testpw",
         "keystone_project": "admin",
         "keystone_domain": "admin_domain",
-        "keystone_server_url": f"https://{keystone_unit.public_address}:5000/v3",
-        "kubernetes_api_server": f"https://{control_plane_unit.public_address}:6443",
+        "keystone_server_url": f"https://{keystone_address}:5000/v3",
+        "kubernetes_api_server": f"https://{api_server_address}:6443",
     }
     kubeconfig_template = Path("tests/data/keystone-kubeconfig.yaml").read_text()
     kubeconfig: Path = tmp_path / "kubeconfig"

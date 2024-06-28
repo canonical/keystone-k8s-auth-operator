@@ -107,9 +107,12 @@ class KeystoneK8sCharm(ops.CharmBase):
 
     def _update_status(self):
         unready = self.collector.unready
-        self._request_certificates()  # ensure certificate request is up-to-date
         if unready:
-            self.unit.status = ops.WaitingStatus(", ".join(unready))
+            status.add(ops.WaitingStatus(", ".join(unready)))
+            raise status.ReconcilerError("Waiting for deployment")
+        elif not self.provider.get_service_url():
+            status.add(ops.WaitingStatus("Waiting for service"))
+            raise status.ReconcilerError("Service is not ready")
         else:
             self.unit.set_workload_version(self.collector.short_version)
             if self.unit.is_leader():
