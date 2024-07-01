@@ -51,7 +51,10 @@ juju config kubernetes-control-plane authorization-mode="Node,Webhook,RBAC"
 Before removing, ensure the control-plane is ignoring the service
 
 ```bash
-juju config kubernetes-control-plane --reset authorization-webhook-config-file --reset authorization-mode --reset authn-webhook-endpoint
+juju config kubernetes-control-plane \
+    --reset authorization-webhook-config-file \
+    --reset authorization-mode \
+    --reset authn-webhook-endpoint
 juju remove-application keystone-k8s-auth
 ```
 
