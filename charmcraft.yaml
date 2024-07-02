@@ -8,7 +8,7 @@ links:
   contact: https://launchpad.net/~containers
   documentation: https://discourse.charmhub.io/t/keystone-k8s-auth/14554
   issues:
-  - https://github.com/canonical/keystone-k8s-auth-operator/issues
+  - https://bugs.launchpad.net/keystone-k8s-auth-operator
   source:
   - https://github.com/canonical/keystone-k8s-auth-operator
 
