@@ -26,22 +26,22 @@ juju integrate keystone-k8s-auth:kubernetes   kubernetes-control-plane:juju-info
 ```
 
 You must also tell the cluster on which it is deployed that it will be
-acting as an authentication and authorization provider. 
+acting as an authentication and authorization provider.
 For Charmed Kubernetes, you'll need to configure the auth settings
 
 ### Authentication or Authorization
 ```bash
 # find the service ip in the cluster, apply as the authn webhook
 service_url=$(juju run keystone-k8s-auth/leader get-service-url | yq '.service-url')
-juju config kubernetes-control-plane authn-webhook-endpoint="${service_url}",
+juju config kubernetes-control-plane authn-webhook-endpoint="${service_url}"
 ```
 
 For authorization, you'll need to build a [webhook_config](https://github.com/kubernetes/cloud-provider-openstack/blob/master/examples/webhook/keystone-apiserver-webhook.yaml) file.
 
 ### Authorization
 ```bash
-juju run keystone-k8s-auth/leader generate-webhook | yq '.webhook' > webhook
-juju config kubernetes-control-plane authorization-webhook-config-file=$(cat webhook)
+juju run keystone-k8s-auth/leader generate-webhook-config | yq '.webhook-config' > webhook
+juju config kubernetes-control-plane authorization-webhook-config-file="$(cat webhook)"
 juju config kubernetes-control-plane authorization-mode="Node,Webhook,RBAC"
 ```
 
