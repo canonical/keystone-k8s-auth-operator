@@ -1,6 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-"""Implementation of cloud-controller specific details of the kubernetes manifests."""
+"""Implementation of keystone-k8s-auth specific details of the kubernetes manifests."""
 
 import base64
 import logging
@@ -33,11 +33,11 @@ class CreateSecret(Addition):
     def __call__(self) -> Optional[AnyResource]:
         """Craft the secrets object for the deployment."""
 
-        tls_cert: str = self.manifests.config.get("tls.crt")
-        tls_key: str = self.manifests.config.get("tls.key")
+        tls_cert: str = self.manifests.config.get("tls.crt", "")
+        tls_key: str = self.manifests.config.get("tls.key", "")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
         log.info("Encode secret data for k8s-keystone-auth.")
-        secret = Secret(
+        struct = dict(
             metadata={"name": SECRET_NAME, "namespace": NAMESPACE},
             type="kubernetes.io/tls",
             data={
@@ -46,7 +46,9 @@ class CreateSecret(Addition):
             },
         )
         if ca_cert:
-            secret.data["ca.crt"] = base64.b64encode(ca_cert.encode()).decode()
+            log.info("Adding ca.crt to secret.")
+            struct["data"]["ca.crt"] = base64.b64encode(ca_cert.encode()).decode()
+        return Secret.from_dict(struct)
 
 
 class UpdateDeployment(Patch):
@@ -64,10 +66,12 @@ class UpdateDeployment(Patch):
                 volume.secret.secretName = SECRET_NAME
                 log.info(f"Setting secret for {obj.kind}/{obj.metadata.name}")
 
-        server_url: str = self.manifests.config.get("keystone-url")
+        server_url: str = self.manifests.config.get("keystone-url", "")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
+        replicas: int = self.manifests.config.get("replicas", 2)
 
         log.info("Patching server_url for %s/%s", obj.kind, obj.metadata.name)
+        obj.spec.replicas = replicas
         for container in obj.spec.template.spec.containers:
             if container.name == RESOURCE_NAME:
                 for env in container.env:
@@ -83,7 +87,7 @@ class Policy(Addition):
 
     def __call__(self) -> Optional[AnyResource]:
         """Craft the policy config-map object."""
-        policy: str = self.manifests.config["keystone-policy-configmap"]
+        policy: str = self.manifests.config.get("keystone-policy-configmap", "[]")
 
         return ConfigMap.from_dict(
             dict(
@@ -145,7 +149,7 @@ class ProviderManifests(Manifests):
             if value == "" or value is None:
                 del config[key]
 
-        config["release"] = config.pop("manager-release", None)
+        config["release"] = config.pop("release", None)
         return config
 
     def hash(self) -> int:
@@ -154,6 +158,10 @@ class ProviderManifests(Manifests):
 
     def evaluate(self) -> Optional[str]:
         """Determine if manifest_config can be applied to manifests."""
+        release_path = self.manifest_path / self.current_release
+        if not release_path.exists():
+            return f"Release {self.current_release} does not exist."
+
         props = (
             CreateSecret.REQUIRED_CONFIG
             | UpdateDeployment.REQUIRED_CONFIG
@@ -169,8 +177,9 @@ class ProviderManifests(Manifests):
         """Return the service url."""
         if fqdn:
             return f"https://{SERVICE_NAME}.{NAMESPACE}.svc.cluster.local:8443/webhook"
-        for rsc in self.installed_resources():
-            if rsc.kind == "Service" and rsc.name == SERVICE_NAME and rsc.namespace == NAMESPACE:
-                svc: Service = rsc.resource
-                return f"https://{svc.spec.clusterIP}:8443/webhook"
+        try:
+            svc: Service = self.client.get(Service, SERVICE_NAME, namespace=NAMESPACE)
+            return f"https://{svc.spec.clusterIP}:8443/webhook"
+        except Exception as e:
+            log.error("Failed to get service url. ex=%s", e)
         return None
