@@ -80,8 +80,10 @@ class KeystoneCredentialsRequires(ops.Object):
     @cached_property
     def _raw_data(self) -> Optional[ops.RelationData]:
         if self.relation and self.relation.units:
-            first = list(self.relation.units)[0]
-            return self.relation.data[first]
+            data = {}
+            for unit in self.relation.units:
+                data.update(self.relation.data[unit])
+            return data
         return None
 
     @cached_property
