@@ -47,7 +47,10 @@ config:
     keystone-ssl-ca:
       type: string
       description: |
-        Keystone certificate authority encoded in base64 for securing communications to Keystone.
+        (Optional) Keystone certificate authority encoded in base64 for securing communications to Keystone.
+
+        If the CA cert provided via the certificates relation is not sufficient, this option can be used to provide a custom CA cert.
+        The certificate should be in PEM format, encoded in base64 is optional.
         For example: `juju config keystone-k8s-auth keystone-ssl-ca=$(base64 /path/to/ca.crt)`
     
     keystone-policy-configmap:

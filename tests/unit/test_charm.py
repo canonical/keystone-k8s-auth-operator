@@ -150,11 +150,12 @@ def test_waits_for_kube_control(mock_create_kubeconfig, harness, caplog):
     mock_create_kubeconfig.assert_not_called()
 
     caplog.clear()
-    harness.update_relation_data(
-        rel_id,
-        "kubernetes-control-plane/0",
-        yaml.safe_load(Path("tests/data/kube_control_data.yaml").read_text()),
-    )
+    with mock.patch.object(charm.provider, "validate_certificate", return_value=None):
+        harness.update_relation_data(
+            rel_id,
+            "kubernetes-control-plane/0",
+            yaml.safe_load(Path("tests/data/kube_control_data.yaml").read_text()),
+        )
     mock_create_kubeconfig.assert_called_once_with(
         charm._ca_cert_path, charm._kubeconfig_path, "root", charm.unit.name
     )
