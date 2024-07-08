@@ -5,6 +5,7 @@
 import base64
 import logging
 import pickle
+import ssl
 from hashlib import md5
 from typing import Dict, Optional
 
@@ -171,7 +172,22 @@ class ProviderManifests(Manifests):
             value = self.config.get(prop)
             if not value:
                 return f"Manifests require the definition of '{prop}'"
+        for certificate in ["keystone-ssl-ca"]:
+            if err := self.validate_certificate(certificate):
+                return err
         return None
+
+    def validate_certificate(self, which_cert: str) -> Optional[str]:
+        if self.config.get(which_cert) is None:
+            return None
+        try:
+            cert: str = self.config.get(which_cert)
+            ssl.PEM_cert_to_DER_cert(cert)
+            return None
+        except ValueError:
+            msg = f"Certificate '{which_cert}' is not valid PEM certificate."
+            log.error(msg)
+            return msg
 
     def get_service_url(self, fqdn=False) -> Optional[str]:
         """Return the service url."""
