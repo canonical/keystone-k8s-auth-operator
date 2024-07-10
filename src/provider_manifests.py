@@ -9,7 +9,7 @@ import pickle
 import shlex
 import ssl
 from hashlib import md5
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from lightkube.codecs import AnyResource
 from lightkube.models.apps_v1 import Deployment
@@ -81,14 +81,14 @@ class UpdateDeployment(Patch):
         server_url: str = self.manifests.config.get("keystone-url", "")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
         replicas: int = self.manifests.config.get("replicas", 2)
-        extra_args: str = shlex.split(self.manifests.config.get("extra-args", ""))
+        extra_args: List[str] = shlex.split(self.manifests.config.get("extra-args", ""))
 
         log.info("Patching server_url for %s/%s", obj.kind, obj.metadata.name)
         obj.spec.replicas = replicas
         obj.spec.template.metadata.annotations = {}
         for container in obj.spec.template.spec.containers:
             if container.name == RESOURCE_NAME:
-                container.args += extra_args
+                container.args = container.args[:1] + extra_args
                 for env in container.env:
                     if env.name == "OS_AUTH_URL":
                         env.value = server_url
