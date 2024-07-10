@@ -44,6 +44,13 @@ bases:
 
 config:
   options:
+    extra-args:
+      type: string
+      description: |
+        (Optional) Extra arguments to pass to the k8s-keystone-auth deployment.
+        Argument string will be split by shlex rules
+        For example: `juju config keystone-k8s-auth extra-args='--debug'`
+
     keystone-ssl-ca:
       type: string
       description: |

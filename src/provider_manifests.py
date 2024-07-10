@@ -3,17 +3,27 @@
 """Implementation of keystone-k8s-auth specific details of the kubernetes manifests."""
 
 import base64
+import datetime
 import logging
 import pickle
+import shlex
 import ssl
 from hashlib import md5
 from typing import Dict, Optional
 
 from lightkube.codecs import AnyResource
+from lightkube.models.apps_v1 import Deployment
 from lightkube.models.core_v1 import EnvVar
 from lightkube.resources.core_v1 import ConfigMap, Secret, Service
 from ops.interface_tls_certificates import CertificatesRequires
-from ops.manifests import Addition, ConfigRegistry, ManifestLabel, Manifests, Patch
+from ops.manifests import (
+    Addition,
+    ConfigRegistry,
+    HashableResource,
+    ManifestLabel,
+    Manifests,
+    Patch,
+)
 
 log = logging.getLogger(__file__)
 COMMON_NAME = "k8s-keystone-auth.kube-system"
@@ -61,6 +71,7 @@ class UpdateDeployment(Patch):
         """Patch the k8s-keyston-auth deployment."""
         if not (obj.kind == "Deployment" and obj.metadata.name == RESOURCE_NAME):
             return
+        obj: Deployment = obj
 
         for volume in obj.spec.template.spec.volumes:
             if volume.secret:
@@ -70,11 +81,14 @@ class UpdateDeployment(Patch):
         server_url: str = self.manifests.config.get("keystone-url", "")
         ca_cert: str = self.manifests.config.get("keystone-ssl-ca")
         replicas: int = self.manifests.config.get("replicas", 2)
+        extra_args: str = shlex.split(self.manifests.config.get("extra-args", ""))
 
         log.info("Patching server_url for %s/%s", obj.kind, obj.metadata.name)
         obj.spec.replicas = replicas
+        obj.spec.template.metadata.annotations = {}
         for container in obj.spec.template.spec.containers:
             if container.name == RESOURCE_NAME:
+                container.args += extra_args
                 for env in container.env:
                     if env.name == "OS_AUTH_URL":
                         env.value = server_url
@@ -199,3 +213,22 @@ class ProviderManifests(Manifests):
         except Exception as e:
             log.error("Failed to get service url. ex=%s", e)
         return None
+
+    def apply_manifests(self):
+        """Apply the manifests to the cluster and restart deployments."""
+        super().apply_manifests()
+        for rsc in self.resources:
+            self.restart(rsc)
+
+    def restart(self, obj: HashableResource):
+        """Restart the hashable object if its possible to do so."""
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        T = type(obj.resource)
+        patch = obj.resource
+        try:
+            patch.spec.template.metadata.annotations["juju.io/restartedAt"] = timestamp
+        except AttributeError:
+            log.error("Cannot restart %s/%s", obj.kind, obj.name)
+            return
+        log.info("Restarting %s/%s", obj.kind, obj.name)
+        self.client.patch(T, obj.name, patch, namespace=obj.namespace)

@@ -2,6 +2,7 @@ import unittest.mock as mock
 from pathlib import Path
 
 import pytest
+from lightkube.resources.apps_v1 import Deployment
 
 from provider_manifests import ProviderManifests
 
@@ -55,3 +56,12 @@ def test_provider_manifest_invalid_certificate(provider_manifest):
         provider_manifest.evaluate()
         == "Certificate 'keystone-ssl-ca' is not valid PEM certificate."
     )
+
+
+def test_apply_resources(provider_manifest):
+    provider_manifest.apply_manifests()
+    provider_manifest.client.patch.assert_called_once()
+    args, kwargs = provider_manifest.client.patch.call_args
+    assert args[:2] == (Deployment, "k8s-keystone-auth")
+    assert args[2].spec.template.metadata.annotations["juju.io/restartedAt"]
+    assert kwargs == {"namespace": "kube-system"}
