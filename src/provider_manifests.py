@@ -222,7 +222,7 @@ class ProviderManifests(Manifests):
 
     def restart(self, obj: HashableResource):
         """Restart the hashable object if its possible to do so."""
-        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
         T = type(obj.resource)
         patch = obj.resource
         try:
