@@ -67,11 +67,10 @@ class UpdateDeployment(Patch):
 
     REQUIRED_CONFIG = {"keystone-url"}
 
-    def __call__(self, obj):
+    def __call__(self, obj: AnyResource):
         """Patch the k8s-keyston-auth deployment."""
-        if not (obj.kind == "Deployment" and obj.metadata.name == RESOURCE_NAME):
+        if not (isinstance(obj, Deployment) and obj.metadata.name == RESOURCE_NAME):
             return
-        obj: Deployment = obj
 
         for volume in obj.spec.template.spec.volumes:
             if volume.secret:
