@@ -41,6 +41,9 @@ bases:
   - name: ubuntu
     channel: "22.04"
     architectures: [amd64, arm64, s390x]
+  - name: ubuntu
+    channel: "24.04"
+    architectures: [amd64, arm64, s390x]
 
 config:
   options:
@@ -59,7 +62,7 @@ config:
         If the CA cert provided via the certificates relation is not sufficient, this option can be used to provide a custom CA cert.
         The certificate should be in PEM format, encoded in base64 is optional.
         For example: `juju config keystone-k8s-auth keystone-ssl-ca=$(base64 /path/to/ca.crt)`
-    
+
     keystone-policy-configmap:
       type: string
       description: |
@@ -99,13 +102,13 @@ config:
 
         example)
           juju config keystone-k8s-auth release='v1.30.0'
-        
+
         A list of supported versions is available through the action:
           juju run-action keystone-k8s-auth/leader list-releases --wait
-        
+
         To reset by to the latest supported by the charm use:
           juju config keystone-k8s-auth --reset release
-        
+
         The current release deployed is available by viewing
           juju status keystone-k8s-auth
     replicas:
@@ -146,7 +149,7 @@ actions:
         type: string
         default: ""
         description: |
-          Space separated list of kubernetes resource types to filter scrubbing   
+          Space separated list of kubernetes resource types to filter scrubbing
   sync-resources:
     description: |
       Add kubernetes resources which should be created by this charm which aren't
@@ -164,6 +167,7 @@ parts:
   charm:
     build-packages:
     - git
+    charm-binary-python-packages: [importlib-metadata]
     charm-python-packages: [setuptools, pip]
     prime:
     - upstream/**
