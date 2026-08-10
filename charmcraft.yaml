@@ -92,7 +92,7 @@ config:
         If unset, the manifests will use the image registry from the kube-control relation
 
         example)
-          juju config keystone-k8s-auth image-registry='rocks.canonical.com:443/cdk'
+          juju config keystone-k8s-auth image-registry='ghcr.io/canonical/cdk'
           juju config keystone-k8s-auth --reset image-registry
     release:
       type: string
