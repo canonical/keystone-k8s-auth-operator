@@ -10,6 +10,6 @@ jobs:
 
   lint-unit:
     name: Lint Unit
-    uses: charmed-kubernetes/workflows/.github/workflows/lint-unit.yaml@6ee58c37d404effad4598ce7b523dbaf0cb99285 # main
+    uses: charmed-kubernetes/workflows/.github/workflows/lint-unit.yaml@ffc5dc93fb43e4038cccb605fd6a07886bdef23e # main
     with:
       python: "['3.8', '3.10', '3.12']"
