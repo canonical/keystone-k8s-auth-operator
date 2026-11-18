@@ -170,3 +170,35 @@ def test_waits_for_kube_control(mock_create_kubeconfig, harness, caplog):
     }
 
     caplog.clear()
+
+
+@mock.patch("provider_manifests.ProviderManifests.evaluate", mock.MagicMock(return_value=None))
+def test_refresh_to_new_default_release_reapplies_manifests(harness, lk_client):
+    """A refresh with `release` left at its default rolls out the new default release."""
+    harness.set_leader(True)
+    harness.begin()
+    charm = harness.charm
+    new_default = charm.provider.default_release
+    assert charm.config["release"] == new_default
+
+    # config hash stored by a previous revision: no schema default, version v1.30.0
+    previous_config = dict(charm.charm_config.available_data)
+    del previous_config["release"]
+    old_config = mock.patch.object(
+        type(charm.charm_config), "available_data", new_callable=mock.PropertyMock
+    )
+    old_default = mock.patch.object(
+        type(charm.provider), "default_release", new_callable=mock.PropertyMock
+    )
+    with old_config as available_data, old_default as default_release:
+        available_data.return_value = previous_config
+        default_release.return_value = "v1.30.0"
+        assert charm.provider.current_release == "v1.30.0"
+        charm.stored.config_hash = charm.evaluate_manifests()
+
+    charm.install_manifests(config_hash=charm.evaluate_manifests())
+
+    applied = [c.args[0] for c in lk_client.apply.call_args_list]
+    (deployment,) = [r for r in applied if r.kind == "Deployment"]
+    (container,) = deployment.spec.template.spec.containers
+    assert container.image.endswith(f"/k8s-keystone-auth:{new_default}")

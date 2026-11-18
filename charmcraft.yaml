@@ -106,11 +106,12 @@ config:
         A list of supported versions is available through the action:
           juju run-action keystone-k8s-auth/leader list-releases --wait
 
-        To reset by to the latest supported by the charm use:
+        To reset to the default release of the charm use:
           juju config keystone-k8s-auth --reset release
 
         The current release deployed is available by viewing
           juju status keystone-k8s-auth
+      default: v1.36.0
     replicas:
       type: int
       description: |
